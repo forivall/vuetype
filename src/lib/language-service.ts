@@ -73,7 +73,7 @@ export class LanguageService {
 }
 
 export class LanguageServiceHost implements ts.LanguageServiceHost {
-  private moduleResolutionFiles = new TsFileMap();
+  private moduleResolutionFiles = new TsFileMap()
   private moduleResolutionHost: ts.ModuleResolutionHost = {
     fileExists: (file: string) => {
       this.moduleResolutionFiles.updateFile(file)
