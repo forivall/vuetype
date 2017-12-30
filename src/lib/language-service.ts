@@ -1,5 +1,7 @@
 import ts = require('typescript')
 import { TsFileMap } from './ts-file-map'
+import D = require('debug')
+const debug = D('vuetype:language-service')
 
 export interface Result<T> {
   result: T | null
@@ -15,7 +17,7 @@ export class LanguageService {
       this.files.updateFile(file)
     })
 
-    const serviceHost = this.makeServiceHost(options)
+    const serviceHost = new LanguageServiceHost(this.files, options)
     this.tsService = ts.createLanguageService(serviceHost, ts.createDocumentRegistry())
   }
 
@@ -34,6 +36,7 @@ export class LanguageService {
       }
     }
 
+    debug('getting emit output for %s', fileName)
     const output = this.tsService.getEmitOutput(fileName, true)
 
     if (!output.emitSkipped) {
@@ -52,20 +55,6 @@ export class LanguageService {
     }
   }
 
-  private makeServiceHost (options: ts.CompilerOptions): ts.LanguageServiceHost {
-    return {
-      getScriptFileNames: () => this.files.fileNames,
-      getScriptVersion: fileName => this.files.getVersion(fileName),
-      getScriptSnapshot: fileName => {
-        const src = this.files.getSrc(fileName)
-        return src && ts.ScriptSnapshot.fromString(src)
-      },
-      getCurrentDirectory: () => process.cwd(),
-      getCompilationSettings: () => options,
-      getDefaultLibFileName: options => ts.getDefaultLibFilePath(options)
-    } as ts.LanguageServiceHost
-  }
-
   private collectErrorMessages (fileName: string): string[] {
     const allDiagnostics = this.tsService.getCompilerOptionsDiagnostics()
       .concat(this.tsService.getSyntacticDiagnostics(fileName))
@@ -75,11 +64,42 @@ export class LanguageService {
       const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
 
       if (diagnostic.file) {
-        const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start)
+        const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start || 0)
         return `[${line + 1},${character + 1}] ${message}`
       }
       return message
     })
+  }
+}
+
+export class LanguageServiceHost implements ts.LanguageServiceHost {
+  private moduleResolutionFiles = new TsFileMap();
+  private moduleResolutionHost: ts.ModuleResolutionHost = {
+    fileExists: (file: string) => {
+      this.moduleResolutionFiles.updateFile(file)
+      const r = this.moduleResolutionFiles.canEmit(file)
+      return r
+    },
+    readFile: (file: string) => {
+      return this.moduleResolutionFiles.getSrc(file)
+    }
+  }
+  constructor(private files: TsFileMap, private options: ts.CompilerOptions) {
+  }
+
+  getScriptFileNames() { return this.files.fileNames }
+  getScriptVersion(fileName: string) { return this.files.getVersion(fileName) || '0' }
+  getScriptSnapshot(fileName: string) {
+    const src = this.files.getSrc(fileName) || ''
+    return ts.ScriptSnapshot.fromString(src)
+  }
+  getCurrentDirectory() { return process.cwd() }
+  getCompilationSettings() { return this.options }
+  getDefaultLibFileName(options: ts.CompilerOptions) { return ts.getDefaultLibFilePath(options) }
+
+  resolveModuleNames(moduleNames: string[], containingFile: string, reusedNames?: string[]): ts.ResolvedModule[] {
+    const resolvedModules = moduleNames.map((moduleName) => ts.resolveModuleName(moduleName, containingFile, this.options, this.moduleResolutionHost).resolvedModule)
+    return resolvedModules as ts.ResolvedModuleFull[]
   }
 }
 

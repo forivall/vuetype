@@ -15,12 +15,12 @@ export function readFile (filePath: string): Promise<string> {
   return exec(fs.readFile, filePath, 'utf8')
 }
 
-export function writeFile (filePath: string, data: string): Promise<never> {
-  return exec(fs.writeFile, filePath, data)
+export function writeFile (filePath: string, data: string): Promise<void> {
+  return exec(fs.writeFile, filePath, data).then(() => void 0)
 }
 
-export function unlink (filePath: string): Promise<never> {
-  return exec(fs.unlink, filePath)
+export function unlink (filePath: string): Promise<void> {
+  return exec(fs.unlink, filePath).then(() => void 0)
 }
 
 export function exists (filePath: string): boolean {

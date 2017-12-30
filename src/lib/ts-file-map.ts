@@ -2,6 +2,8 @@ import assert = require('assert')
 import ts = require('typescript')
 import vueCompiler = require('vue-template-compiler')
 import { readFileSync, exists } from './file-util'
+import D = require('debug')
+const debug = D('vuetype:ts-file-map')
 
 export interface TsFile {
   rawFileName: string
