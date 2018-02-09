@@ -15,12 +15,15 @@ program
   .version(meta.version)
   .usage('<directory...>')
   .option('-w, --watch', 'watch file changes')
+  .option('-f, --file', 'use list of files instead of directory')
   .parse(process.argv)
 
 if (program.args.length === 0) {
   program.help()
 } else {
-  const root = path.resolve(deepestSharedRoot(program.args))
+  let dirs = program.args
+  if (program.file) dirs = dirs.map(path.dirname)
+  const root = path.resolve(deepestSharedRoot(dirs))
   const configPath = findConfig(root)
   const config = configPath && readConfig(configPath)
   const options = config ? config.options : {}
@@ -28,9 +31,12 @@ if (program.args.length === 0) {
   if (program['watch']) {
     watch(program.args, options)
   } else {
-    const patterns = program.args.map(arg => {
-      return path.join(arg, '**/*.vue')
-    })
+    let patterns = program.args
+    if (!program.file) {
+      patterns = patterns.map(arg => {
+        return path.join(arg, '**/*.vue')
+      })
+    }
     generate(globSync(patterns), options)
   }
 }
